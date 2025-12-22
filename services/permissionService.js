@@ -132,7 +132,7 @@ permission.add = async (req, res, next) => {
                   <p>Once Logged in ,You will be able to set a prsonalized and secure password.</p>
                   <p>with these log in details , you can now connect to:</p>
                   <h3>Click to Login</h3>
-                  <a href="https://www.tuneplus.in" class="login-button">Log In</a>
+                  <a href="https://music-dashboard-frontend-1.onrender.com/Login" class="login-button">Log In</a>
                 </div>
                 <div class="footer">
                   <p>&copy; 2025  Tune Plus . All rights reserved.</p>

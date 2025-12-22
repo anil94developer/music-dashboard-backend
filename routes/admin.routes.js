@@ -230,5 +230,38 @@ const membershipUsersService = require("../services/membershipUsersService");
 router.get("/membership-users", verifyToken, membershipUsersService.getAllMembershipUsers);
 router.get("/user-memberships", verifyToken, membershipUsersService.getUserMemberships);
 
+// Master Artist Routes
+const masterArtistService = require("../services/masterArtistService");
+const { masterArtistValidation, updateMasterArtistValidation } = require("../validation/admin/masterArtist.validation");
+
+// Test route to verify master artist routes are loaded
+router.get("/test-master-artist-route", (req, res) => {
+    res.json({ 
+        status: true, 
+        message: "Master artist routes are working", 
+        timestamp: new Date(),
+        route: "/admin/add-master-artist"
+    });
+});
+
+router.post("/add-master-artist", verifyToken, masterArtistValidation, masterArtistService.addMasterArtist);
+router.get("/master-artist-list", verifyToken, masterArtistService.getMasterArtistList);
+router.get("/master-artist/:id", verifyToken, masterArtistService.getMasterArtistById);
+router.post("/update-master-artist/:id", verifyToken, updateMasterArtistValidation, masterArtistService.updateMasterArtist);
+router.post("/delete-master-artist/:id", verifyToken, masterArtistService.deleteMasterArtist);
+router.post("/change-master-artist-status/:id", verifyToken, masterArtistService.changeStatus);
+router.get("/active-master-artists", masterArtistService.getActiveMasterArtists); // Public endpoint
+
+// Master Label Routes
+const masterLabelService = require("../services/masterLabelService");
+const { masterLabelValidation, updateMasterLabelValidation } = require("../validation/admin/masterLabel.validation");
+
+router.post("/add-master-label", verifyToken, masterLabelValidation, masterLabelService.addMasterLabel);
+router.get("/master-label-list", verifyToken, masterLabelService.getMasterLabelList);
+router.get("/master-label/:id", verifyToken, masterLabelService.getMasterLabelById);
+router.post("/update-master-label/:id", verifyToken, updateMasterLabelValidation, masterLabelService.updateMasterLabel);
+router.post("/delete-master-label/:id", verifyToken, masterLabelService.deleteMasterLabel);
+router.post("/change-master-label-status/:id", verifyToken, masterLabelService.changeStatus);
+router.get("/active-master-labels", masterLabelService.getActiveMasterLabels); // Public endpoint
 
 module.exports = router

@@ -76,11 +76,8 @@ paymentService.createPaymentOrder = async (req, res, next) => {
         orderMeta.notifyUrl = `${process.env.BACKEND_URL || "http://localhost:8002"}/payment/webhook`;
 
         // ============================================
-        // PAYMENT GATEWAY BYPASSED FOR TESTING
+        // CASHFREE PAYMENT GATEWAY INTEGRATION
         // ============================================
-        // TODO: Uncomment below code when ready to enable payment gateway
-        
-        /*
         const orderRequest = new CFOrderRequest();
         orderRequest.orderId = orderId;
         orderRequest.orderAmount = amount;
@@ -209,11 +206,11 @@ paymentService.createPaymentOrder = async (req, res, next) => {
                 durationType: membership.durationType
             }
         }, 200);
-        */
 
         // ============================================
-        // BYPASS MODE: Direct company registration
+        // BYPASS MODE: Direct company registration (COMMENTED OUT - Use only for testing)
         // ============================================
+        /*
         console.log("⚠️ PAYMENT BYPASSED - Direct company registration mode");
         
         // Save payment record with SUCCESS status (for testing)
@@ -293,6 +290,7 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             console.error("Error in direct company registration:", error);
             return R(res, false, `Company registration error: ${error.message || "Failed to register company"}`, {}, 500);
         }
+        */
 
     } catch (error) {
         console.error("Error in createPaymentOrder:", error);
