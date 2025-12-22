@@ -72,8 +72,13 @@ paymentService.createPaymentOrder = async (req, res, next) => {
         customerDetails.customerPhone = companyData?.phoneNumber || "";
 
         const orderMeta = new CFOrderMeta();
-        orderMeta.returnUrl = `${process.env.FRONTEND_URL || "https://tuneplusmusic.com/tunepluswebsite"}/payment-success.php?order_id={order_id}`;
-        orderMeta.notifyUrl = `https://music-dashboard-backend-yh7q.onrender.com/payment/webhook`;
+        // Set return URL - Cashfree will replace {order_id} with actual order ID
+        const frontendUrl = process.env.FRONTEND_URL || "https://tuneplusmusic.com/tunepluswebsite";
+        orderMeta.returnUrl = `${frontendUrl}/payment-success.php?order_id={order_id}`;
+        orderMeta.notifyUrl = `${process.env.BACKEND_URL || "https://music-dashboard-backend-yh7q.onrender.com"}/payment/webhook`;
+        
+        console.log("Payment return URL:", orderMeta.returnUrl);
+        console.log("Payment webhook URL:", orderMeta.notifyUrl);
 
         // ============================================
         // CASHFREE PAYMENT GATEWAY INTEGRATION
