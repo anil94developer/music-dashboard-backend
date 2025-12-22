@@ -72,8 +72,8 @@ paymentService.createPaymentOrder = async (req, res, next) => {
         customerDetails.customerPhone = companyData?.phoneNumber || "";
 
         const orderMeta = new CFOrderMeta();
-        orderMeta.returnUrl = `${process.env.FRONTEND_URL || "http://localhost/tunepluswebsite"}/payment-success.php?order_id={order_id}`;
-        orderMeta.notifyUrl = `${process.env.BACKEND_URL || "http://localhost:8002"}/payment/webhook`;
+        orderMeta.returnUrl = `${process.env.FRONTEND_URL || "https://tuneplusmusic.com/tunepluswebsite"}/payment-success.php?order_id={order_id}`;
+        orderMeta.notifyUrl = `https://music-dashboard-backend-yh7q.onrender.com/payment/webhook`;
 
         // ============================================
         // CASHFREE PAYMENT GATEWAY INTEGRATION
