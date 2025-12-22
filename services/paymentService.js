@@ -418,7 +418,20 @@ paymentService.paymentWebhook = async (req, res, next) => {
         await paymentModel.updatePayment(orderId, updateData);
 
         // If payment successful, create company account
-        if (paymentStatus === "SUCCESS" && payment.companyData && payment.status !== "SUCCESS") {
+        if (paymentStatus === "SUCCESS" && payment.companyData) {
+            // Check if company already registered (to avoid duplicate registration)
+            const existingPayment = await paymentModel.getPaymentByOrderId(orderId);
+            if (existingPayment && existingPayment.status === "SUCCESS") {
+                // Check if company was already created
+                const authModel = require("../models/authmodels");
+                const existingUser = await authModel.checkAvailablity(payment.companyData.email);
+                
+                if (existingUser && existingUser.length > 0) {
+                    console.log("Company already registered for this payment");
+                    return R(res, true, "Webhook processed - Company already registered", {}, 200);
+                }
+            }
+            
             // Import company service
             const companyService = require("./companyServices");
             
@@ -427,15 +440,47 @@ paymentService.paymentWebhook = async (req, res, next) => {
                 body: {
                     ...payment.companyData,
                     membershipId: payment.membershipId,
-                    role: "company"
+                    role: "company",
+                    paymentId: payment._id // Pass payment ID for membershipusers table
                 }
+            };
+
+            // Create a mock response handler to capture the result
+            let companyResult = null;
+            let companyError = null;
+            
+            const mockRes = {
+                status: (code) => ({
+                    json: (data) => {
+                        companyResult = data;
+                        return mockRes;
+                    }
+                })
             };
 
             // Call company registration (without token for webhook)
             try {
-                await companyService.addCompany(companyReq, res, next);
+                await companyService.addCompany(companyReq, mockRes, (err) => {
+                    if (err) {
+                        companyError = err;
+                    }
+                });
+                
+                if (companyError) {
+                    console.error("Error creating company after payment:", companyError);
+                    return R(res, false, "Payment successful but company registration failed", {}, 500);
+                }
+                
+                if (companyResult && companyResult.status === true) {
+                    console.log("Company registered successfully after payment");
+                    return R(res, true, "Webhook processed - Company registered successfully", {}, 200);
+                } else {
+                    console.error("Company registration failed:", companyResult);
+                    return R(res, false, "Payment successful but company registration failed", {}, 500);
+                }
             } catch (error) {
                 console.error("Error creating company after payment:", error);
+                return R(res, false, "Payment successful but company registration failed", {}, 500);
             }
         }
 
