@@ -40,6 +40,15 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             return R(res, false, "Membership ID is required", {}, 400);
         }
 
+        // Check if email already exists before creating payment order
+        if (companyData && companyData.email) {
+            const authModel = require("../models/authmodels");
+            const isUserExist = await authModel.checkAvailablity(companyData.email);
+            if (isUserExist && isUserExist.length > 0) {
+                return R(res, false, "Email already exists. Please use a different email or login with existing account.", {}, 400);
+            }
+        }
+
         // Get membership details
         const membership = await membershipModel.getMembershipById(membershipId);
         if (!membership || membership.is_active !== 1 || membership.is_deleted !== 0) {
