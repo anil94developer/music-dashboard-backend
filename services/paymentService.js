@@ -130,6 +130,32 @@ paymentService.createPaymentOrder = async (req, res, next) => {
 
             paymentSession = cfOrder.paymentSessionId;
             console.log("Payment session created:", paymentSession);
+            console.log("Full Cashfree order response:", JSON.stringify(cfOrder, null, 2));
+            console.log("Cashfree order response keys:", Object.keys(cfOrder || {}));
+            
+            // Check if Cashfree response includes payment URL
+            // Cashfree might return paymentUrl, payment_url, paymentLink, payment_link, or paymentLink in response
+            let paymentUrl = cfOrder.paymentUrl 
+                         || cfOrder.payment_url 
+                         || cfOrder.paymentLink 
+                         || cfOrder.payment_link
+                         || cfOrder.payment_link
+                         || (cfOrder.orderMeta && cfOrder.orderMeta.paymentUrl)
+                         || (cfOrder.orderMeta && cfOrder.orderMeta.payment_url);
+            
+            console.log("Payment URL from response:", paymentUrl);
+            
+            // If payment URL is not in response, construct it based on environment
+            if (!paymentUrl && paymentSession) {
+                // Cashfree payment URL format for PG SDK
+                if (environment === "PRODUCTION") {
+                    paymentUrl = `https://payments.cashfree.com/forms/v2/${paymentSession}`;
+                } else {
+                    paymentUrl = `https://sandbox.cashfree.com/pg/forms/v2/${paymentSession}`;
+                }
+            }
+            
+            console.log("Payment URL:", paymentUrl);
         } catch (error) {
             console.error("Cashfree API Error Details:");
             console.error("Error message:", error.message);
@@ -201,9 +227,20 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             return R(res, false, "Failed to save payment record", {}, 500);
         }
 
+        // Construct payment URL if not already set
+        let finalPaymentUrl = paymentUrl;
+        if (!finalPaymentUrl && paymentSession) {
+            if (environment === "PRODUCTION") {
+                finalPaymentUrl = `https://payments.cashfree.com/forms/v2/${paymentSession}`;
+            } else {
+                finalPaymentUrl = `https://sandbox.cashfree.com/pg/forms/v2/${paymentSession}`;
+            }
+        }
+
         return R(res, true, "Payment order created successfully", {
             orderId: orderId,
             paymentSessionId: paymentSession,
+            paymentUrl: finalPaymentUrl, // Include payment URL in response
             amount: amount,
             membership: {
                 name: membership.name,

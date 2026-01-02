@@ -14,16 +14,31 @@ const auth = {};
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 
+// Email transporter configuration
 const transporter = nodemailer.createTransport({
   host: 'smtp.hostinger.com', // Hostinger's SMTP server
   port: 465, // Use 465 for SSL or 587 for STARTTLS
   secure: true, // Use true for SSL and false for STARTTLS
-    auth: {
-        user: process.env.EMAIL_USER, // Your email from environment variables
-        pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
-    },
-
+  auth: {
+    user: process.env.EMAIL_USER, // Your email from environment variables
+    pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
+  },
+  // Add connection timeout and retry options
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+  // Retry configuration
+  pool: true,
+  maxConnections: 1,
+  maxMessages: 3
 });
+
+// Verify email configuration on startup (optional - logs warning if not configured)
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+  console.warn('⚠️  EMAIL_USER or EMAIL_PASSWORD not set in environment variables. Email sending will fail.');
+} else {
+  console.log('✅ Email configuration loaded successfully');
+}
 auth.addCompany = async (req, res, next) => {
   const {
     aadharNo,
@@ -262,14 +277,25 @@ auth.addCompany = async (req, res, next) => {
       </html>`
     };
 
-    try {
-      const emailResponse = await transporter.sendMail(mailOptions);
-      console.log("Email sent:", emailResponse);
-      return R(res,true,`Account created successfully! Login details sent to ${email}.`,"",200);
-    } catch (error) {
-      console.error("Error sending email:", error.message);
-      return R(res,false, "Failed to send email. Account created but no email sent.","",500);
-    }
+    // Send email in background (non-blocking)
+    // Don't fail registration if email fails - account is already created
+    transporter.sendMail(mailOptions)
+      .then((emailResponse) => {
+        console.log("Email sent successfully:", emailResponse);
+      })
+      .catch((error) => {
+        console.error("Error sending email (non-blocking):", error.message);
+        console.error("Email error details:", error);
+        // Log error but don't fail the registration
+        // Email can be sent later or user can use forgot password
+      });
+    
+    // Return success immediately - account is created
+    // Email is sent in background, if it fails, user can still login and reset password
+    return R(res, true, `Account created successfully! Login details will be sent to ${email}. Please check your email.`, {
+      email: email,
+      message: "If you don't receive the email, you can use 'Forgot Password' to set a new password."
+    }, 200);
   } catch (err) {
     next(err);
   }
