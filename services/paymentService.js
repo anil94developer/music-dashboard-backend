@@ -92,6 +92,8 @@ paymentService.createPaymentOrder = async (req, res, next) => {
         orderRequest.orderMeta = orderMeta;
 
         let paymentSession;
+        let paymentUrl = null; // Declare outside try block to fix scope issue
+        
         try {
             // Create order using Cashfree SDK
             const ordersApiInstance = new OrdersApi(cashfreeBasePath);
@@ -135,10 +137,9 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             
             // Check if Cashfree response includes payment URL
             // Cashfree might return paymentUrl, payment_url, paymentLink, payment_link, or paymentLink in response
-            let paymentUrl = cfOrder.paymentUrl 
+            paymentUrl = cfOrder.paymentUrl 
                          || cfOrder.payment_url 
                          || cfOrder.paymentLink 
-                         || cfOrder.payment_link
                          || cfOrder.payment_link
                          || (cfOrder.orderMeta && cfOrder.orderMeta.paymentUrl)
                          || (cfOrder.orderMeta && cfOrder.orderMeta.payment_url);
@@ -155,7 +156,7 @@ paymentService.createPaymentOrder = async (req, res, next) => {
                 }
             }
             
-            console.log("Payment URL:", paymentUrl);
+            console.log("Final Payment URL:", paymentUrl);
         } catch (error) {
             console.error("Cashfree API Error Details:");
             console.error("Error message:", error.message);
@@ -227,20 +228,30 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             return R(res, false, "Failed to save payment record", {}, 500);
         }
 
-        // Construct payment URL if not already set
-        let finalPaymentUrl = paymentUrl;
-        if (!finalPaymentUrl && paymentSession) {
+        // Ensure payment URL is set before returning
+        // Construct payment URL if not already set (fallback)
+        if (!paymentUrl && paymentSession) {
             if (environment === "PRODUCTION") {
-                finalPaymentUrl = `https://payments.cashfree.com/forms/v2/${paymentSession}`;
+                paymentUrl = `https://payments.cashfree.com/forms/v2/${paymentSession}`;
             } else {
-                finalPaymentUrl = `https://sandbox.cashfree.com/pg/forms/v2/${paymentSession}`;
+                paymentUrl = `https://sandbox.cashfree.com/pg/forms/v2/${paymentSession}`;
             }
+            console.log("Constructed payment URL (fallback):", paymentUrl);
+        }
+
+        // Validate that we have both paymentSession and paymentUrl
+        if (!paymentSession) {
+            return R(res, false, "Failed to create payment order - Payment session ID not available", {}, 500);
+        }
+
+        if (!paymentUrl) {
+            return R(res, false, "Failed to create payment order - Payment URL could not be generated", {}, 500);
         }
 
         return R(res, true, "Payment order created successfully", {
             orderId: orderId,
             paymentSessionId: paymentSession,
-            paymentUrl: finalPaymentUrl, // Include payment URL in response
+            paymentUrl: paymentUrl, // Include payment URL in response
             amount: amount,
             membership: {
                 name: membership.name,
