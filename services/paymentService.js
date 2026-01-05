@@ -63,6 +63,114 @@ paymentService.createPaymentOrder = async (req, res, next) => {
         // Generate unique order ID
         const orderId = `ORDER_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+        // ============================================
+        // BYPASS MODE: Skip Cashfree payment for testing
+        // Set BYPASS_PAYMENT=true in environment variables to enable
+        // ============================================
+        const BYPASS_PAYMENT = process.env.BYPASS_PAYMENT === 'true' || process.env.BYPASS_PAYMENT === '1';
+        
+        if (BYPASS_PAYMENT) {
+            console.log("⚠️ ========================================");
+            console.log("⚠️ PAYMENT BYPASS MODE ENABLED");
+            console.log("⚠️ Skipping Cashfree payment gateway");
+            console.log("⚠️ Directly registering company...");
+            console.log("⚠️ ========================================");
+            
+            // Save payment record with SUCCESS status (for testing)
+            const paymentData = {
+                membershipId: membershipId,
+                orderId: orderId,
+                paymentSessionId: `BYPASS_${orderId}`,
+                amount: amount,
+                currency: "INR",
+                status: "SUCCESS", // Mark as SUCCESS for testing
+                companyData: companyData || {}
+            };
+
+            const payment = await paymentModel.createPayment(paymentData);
+
+            if (!payment) {
+                return R(res, false, "Failed to save payment record", {}, 500);
+            }
+
+            // Directly trigger company registration
+            const companyService = require("./companyServices");
+            
+            // Prepare company registration request
+            const companyReq = {
+                body: {
+                    ...companyData,
+                    membershipId: membershipId,
+                    paymentId: payment._id.toString()
+                }
+            };
+
+            // Create a mock response object to capture the result
+            let registrationResult = null;
+            let registrationError = null;
+
+            try {
+                // Call company registration directly using a promise wrapper
+                await new Promise((resolve, reject) => {
+                    const mockRes = {
+                        status: (code) => ({
+                            json: (data) => {
+                                registrationResult = { statusCode: code, data: data };
+                                resolve(data);
+                            }
+                        })
+                    };
+                    
+                    // Call the addCompany function (companyService exports auth object directly)
+                    companyService.addCompany(companyReq, mockRes, (err) => {
+                        if (err) {
+                            registrationError = err;
+                            reject(err);
+                        } else {
+                            // If no error and no result yet, resolve anyway
+                            if (!registrationResult) {
+                                resolve({ statusCode: 200, data: { message: "Registration completed" } });
+                            }
+                        }
+                    });
+                });
+            } catch (err) {
+                if (!registrationError) {
+                    registrationError = err;
+                }
+                console.error("Error in direct company registration:", err);
+            }
+
+            if (registrationError) {
+                console.error("❌ Company registration failed:", registrationError.message);
+                return R(res, false, `Company registration failed: ${registrationError.message}`, {}, 500);
+            }
+
+            if (registrationResult && registrationResult.statusCode === 200) {
+                console.log("✅ Company registered successfully (Payment bypassed)");
+                console.log("✅ Email should be sent to:", companyData?.email);
+                console.log("✅ Registration response:", registrationResult.data);
+                
+                return R(res, true, "Company registered successfully (Payment bypassed for testing)", {
+                    orderId: orderId,
+                    paymentSessionId: `BYPASS_${orderId}`,
+                    paymentUrl: null, // No payment URL in bypass mode
+                    amount: amount,
+                    membership: {
+                        name: membership.name,
+                        duration: membership.duration,
+                        durationType: membership.durationType
+                    },
+                    bypassMode: true,
+                    registrationData: registrationResult.data,
+                    message: "Payment bypassed - Company registered directly. Check email for login credentials."
+                }, 200);
+            } else {
+                console.error("❌ Company registration returned unexpected result:", registrationResult);
+                return R(res, false, "Company registration failed", registrationResult?.data || {}, 500);
+            }
+        }
+
         // Create payment order request object for Cashfree (using SDK model classes)
         // Generate alphanumeric customer ID (Cashfree requirement: alphanumeric with underscore/hyphen only, no special chars like @)
         const generateCustomerId = (email) => {

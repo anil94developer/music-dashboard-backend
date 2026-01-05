@@ -19,10 +19,10 @@ const transporter = nodemailer.createTransport({
   host: 'smtp.hostinger.com', // Hostinger's SMTP server
   port: 465, // Use 465 for SSL or 587 for STARTTLS
   secure: true, // Use true for SSL and false for STARTTLS
-  auth: {
-    user: process.env.EMAIL_USER, // Your email from environment variables
-    pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
-  },
+    auth: {
+        user: process.env.EMAIL_USER, // Your email from environment variables
+        pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
+    },
   // Add connection timeout and retry options
   connectionTimeout: 10000, // 10 seconds
   greetingTimeout: 10000,
@@ -180,9 +180,17 @@ auth.addCompany = async (req, res, next) => {
       }
     }
 
+    // Verify email configuration before sending
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      console.error("❌ EMAIL CONFIGURATION ERROR: EMAIL_USER or EMAIL_PASSWORD not set in environment variables");
+      console.error("Email will not be sent. Please configure environment variables.");
+    } else {
+      console.log("✅ Email configuration found - EMAIL_USER:", process.env.EMAIL_USER);
+    }
+
     // Send Email with Password
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER || 'noreply@tuneplusmusic.com',
       to: email,
       subject: "Welcome to Our Platform",
       // text: `Thanks for being part of us. Your email for login is ${email} and your password is ${firstName+"@123!"}.`,
@@ -279,16 +287,47 @@ auth.addCompany = async (req, res, next) => {
 
     // Send email in background (non-blocking)
     // Don't fail registration if email fails - account is already created
-    transporter.sendMail(mailOptions)
-      .then((emailResponse) => {
-        console.log("Email sent successfully:", emailResponse);
-      })
-      .catch((error) => {
-        console.error("Error sending email (non-blocking):", error.message);
-        console.error("Email error details:", error);
-        // Log error but don't fail the registration
-        // Email can be sent later or user can use forgot password
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+      console.error("❌ Cannot send email: EMAIL_USER or EMAIL_PASSWORD not configured");
+      console.error("Registration successful but email not sent. User email:", email);
+    } else {
+      // Verify transporter connection first
+      transporter.verify(function (error, success) {
+        if (error) {
+          console.error("❌ SMTP Connection Error:", error.message);
+          console.error("SMTP Error Code:", error.code);
+          console.error("SMTP Error Response:", error.response);
+          console.error("Full Error:", JSON.stringify(error, null, 2));
+        } else {
+          console.log("✅ SMTP Server is ready to send emails");
+          
+          // Now send the email
+          transporter.sendMail(mailOptions)
+            .then((emailResponse) => {
+              console.log("✅ Email sent successfully!");
+              console.log("Email Response:", {
+                messageId: emailResponse.messageId,
+                accepted: emailResponse.accepted,
+                rejected: emailResponse.rejected,
+                response: emailResponse.response
+              });
+            })
+            .catch((error) => {
+              console.error("❌ Error sending email:");
+              console.error("Error Message:", error.message);
+              console.error("Error Code:", error.code);
+              console.error("Error Response:", error.response);
+              console.error("Error Command:", error.command);
+              console.error("Full Error Object:", JSON.stringify(error, null, 2));
+              console.error("Email Details:", {
+                from: mailOptions.from,
+                to: mailOptions.to,
+                subject: mailOptions.subject
+              });
+            });
+        }
       });
+    }
     
     // Return success immediately - account is created
     // Email is sent in background, if it fails, user can still login and reset password
