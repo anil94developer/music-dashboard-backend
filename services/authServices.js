@@ -17,8 +17,8 @@ const crypto = require("crypto");
 const transporter = nodemailer.createTransport({
    
     host: 'smtp.hostinger.com', // Hostinger's SMTP server
-  port: 465, // Use 465 for SSL or 587 for STARTTLS
-  secure: true, // Use true for SSL and false for STARTTLS, // Replace with your email service
+  port: 587, // Use 465 for SSL or 587 for STARTTLS
+  secure: false, // Use true for SSL and false for STARTTLS, // Replace with your email service
     auth: {
         user: process.env.EMAIL_USER, // Your email from environment variables
         pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
