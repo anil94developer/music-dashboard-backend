@@ -445,23 +445,10 @@ auth.forgetPassword = async (req, res, next) => {
         try {
             const emailResponse = await transporter.sendMail(mailOptions);
             console.log("Email sent:", emailResponse);
-            res.status(200).json({ success: true, message: "OTP sent to your email." });
+            return res.status(200).json({ success: true, message: "OTP sent to your email." });
         } catch (error) {
             console.error("Error sending email:", error);
-            res.status(500).json({ success: false, message: "Failed to send OTP. Please try again." });
-        }
-    } catch (error) {
-        console.error("Error in forgetPassword:", error);
-        next(error);
-    }
-        // Send email
-        try {
-            const emailResponse = await transporter.sendMail(mailOptions);
-            console.log("Email sent:", emailResponse);
-            res.status(200).json({ success: true, message: "OTP sent to your email." });
-        } catch (error) {
-            console.error("Error sending email:", error);
-            res.status(500).json({ success: false, message: "Failed to send OTP. Please try again." });
+            return res.status(500).json({ success: false, message: "Failed to send OTP. Please try again." });
         }
     } catch (error) {
         console.error("Error in forgetPassword:", error);

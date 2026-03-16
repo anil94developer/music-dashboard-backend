@@ -34,19 +34,38 @@ paymentService = {};
 // Create payment order
 paymentService.createPaymentOrder = async (req, res, next) => {
     try {
-        const { membershipId, companyData } = req.body;
+        const { membershipId, companyData, userId } = req.body;
 
         if (!membershipId) {
             return R(res, false, "Membership ID is required", {}, 400);
         }
 
-        // Check if email already exists before creating payment order
+        // Check if email already exists before creating payment order (only for new registration with companyData)
         if (companyData && companyData.email) {
             const authModel = require("../models/authmodels");
             const isUserExist = await authModel.checkAvailablity(companyData.email);
             if (isUserExist && isUserExist.length > 0) {
                 return R(res, false, "Email already exists. Please use a different email or login with existing account.", {}, 400);
             }
+        }
+
+        // Resolve customer details: use companyData from body, or fetch by userId when phone is missing (e.g. plan purchase from Dashboard)
+        let customerPayload = companyData ? { ...companyData } : {};
+        const hasPhone = (customerPayload.phoneNumber != null && customerPayload.phoneNumber !== '') || (customerPayload.phone != null && customerPayload.phone !== '');
+        if (userId && !hasPhone) {
+            const authModel = require("../models/authmodels");
+            const user = await authModel.getUser(userId);
+            if (user) {
+                customerPayload = {
+                    firstName: user.firstName || (user.name && user.name.split(' ')[0]) || '',
+                    lastName: user.lastName || (user.name && user.name.split(' ').slice(1).join(' ')) || '',
+                    email: user.email || customerPayload.email || '',
+                    phoneNumber: user.phoneNumber || (user.phone != null && user.phone !== '' ? String(user.phone) : '')
+                };
+            }
+        }
+        if (companyData && (companyData.phoneNumber != null || companyData.phone != null)) {
+            customerPayload.phoneNumber = companyData.phoneNumber || (companyData.phone != null && companyData.phone !== '' ? String(companyData.phone) : '');
         }
 
         // Get membership details
@@ -182,11 +201,17 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             return customerId;
         };
         
+        // Cashfree requires customer_phone; validate before calling API
+        const customerPhone = customerPayload.phoneNumber || (customerPayload.phone != null && customerPayload.phone !== '' ? String(customerPayload.phone) : '');
+        if (!customerPhone || customerPhone.trim() === '') {
+            return R(res, false, "Phone number is required for payment. Please add your phone number in Profile and try again.", {}, 400);
+        }
+
         const customerDetails = new CFCustomerDetails();
-        customerDetails.customerId = generateCustomerId(companyData?.email) || `CUST_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-        customerDetails.customerName = `${companyData?.firstName || ''} ${companyData?.lastName || ''}`.trim() || "Customer";
-        customerDetails.customerEmail = companyData?.email || "";
-        customerDetails.customerPhone = companyData?.phoneNumber || "";
+        customerDetails.customerId = generateCustomerId(customerPayload.email) || `CUST_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+        customerDetails.customerName = `${customerPayload.firstName || ''} ${customerPayload.lastName || ''}`.trim() || (customerPayload.name || "Customer");
+        customerDetails.customerEmail = customerPayload.email || "";
+        customerDetails.customerPhone = customerPhone.trim();
 
         const orderMeta = new CFOrderMeta();
         // Set return URL - Cashfree will replace {order_id} with actual order ID

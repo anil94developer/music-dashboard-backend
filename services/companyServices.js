@@ -14,23 +14,18 @@ const auth = {};
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 
-// Email transporter configuration
+// Email transporter configuration (use 587/STARTTLS - works better on live servers like Render)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.hostinger.com', // Hostinger's SMTP server
-  port: 465, // Use 465 for SSL or 587 for STARTTLS
-  secure: true, // Use true for SSL and false for STARTTLS
-    auth: {
-        user: process.env.EMAIL_USER, // Your email from environment variables
-        pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
-    },
-  // Add connection timeout and retry options
-  connectionTimeout: 10000, // 10 seconds
+  host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+  connectionTimeout: 15000,
   greetingTimeout: 10000,
-  socketTimeout: 10000,
-  // Retry configuration
-  pool: true,
-  maxConnections: 1,
-  maxMessages: 3
+  socketTimeout: 15000,
 });
 
 // Verify email configuration on startup (optional - logs warning if not configured)
@@ -285,48 +280,21 @@ auth.addCompany = async (req, res, next) => {
       </html>`
     };
 
-    // Send email in background (non-blocking)
-    // Don't fail registration if email fails - account is already created
+    // Send email (await so it is attempted before response - required for reliable delivery on live)
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
       console.error("❌ Cannot send email: EMAIL_USER or EMAIL_PASSWORD not configured");
       console.error("Registration successful but email not sent. User email:", email);
     } else {
-      // Verify transporter connection first
-      transporter.verify(function (error, success) {
-        if (error) {
-          console.error("❌ SMTP Connection Error:", error.message);
-          console.error("SMTP Error Code:", error.code);
-          console.error("SMTP Error Response:", error.response);
-          console.error("Full Error:", JSON.stringify(error, null, 2));
-        } else {
-          console.log("✅ SMTP Server is ready to send emails");
-          
-          // Now send the email
-          transporter.sendMail(mailOptions)
-            .then((emailResponse) => {
-              console.log("✅ Email sent successfully!");
-              console.log("Email Response:", {
-                messageId: emailResponse.messageId,
-                accepted: emailResponse.accepted,
-                rejected: emailResponse.rejected,
-                response: emailResponse.response
-              });
-            })
-            .catch((error) => {
-              console.error("❌ Error sending email:");
-              console.error("Error Message:", error.message);
-              console.error("Error Code:", error.code);
-              console.error("Error Response:", error.response);
-              console.error("Error Command:", error.command);
-              console.error("Full Error Object:", JSON.stringify(error, null, 2));
-              console.error("Email Details:", {
-                from: mailOptions.from,
-                to: mailOptions.to,
-                subject: mailOptions.subject
-              });
-            });
-        }
-      });
+      try {
+        const emailResponse = await transporter.sendMail(mailOptions);
+        console.log("✅ Registration email sent successfully to:", email);
+        console.log("Email messageId:", emailResponse.messageId, "accepted:", emailResponse.accepted);
+      } catch (emailErr) {
+        console.error("❌ Registration email failed for:", email);
+        console.error("Error:", emailErr.message);
+        if (emailErr.code) console.error("Code:", emailErr.code);
+        if (emailErr.response) console.error("Response:", emailErr.response);
+      }
     }
     
     // Return success immediately - account is created
