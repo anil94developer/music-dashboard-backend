@@ -20,8 +20,8 @@ const transporter = nodemailer.createTransport({
   port: 587, // Use 465 for SSL or 587 for STARTTLS
   secure: false, // Use true for SSL and false for STARTTLS, // Replace with your email service
     auth: {
-        user: process.env.EMAIL_USER, // Your email from environment variables
-        pass: process.env.EMAIL_PASSWORD, // Your email password from environment variables
+        user: "noreply@tuneplus.org", // Your email from environment variables
+        pass: "Zu@1Jeet121", // Your email password from environment variables
     },
 
 });
