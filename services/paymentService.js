@@ -40,8 +40,8 @@ paymentService.createPaymentOrder = async (req, res, next) => {
             return R(res, false, "Membership ID is required", {}, 400);
         }
 
-        // Check if email already exists before creating payment order (only for new registration with companyData)
-        if (companyData && companyData.email) {
+        // Check if email already exists only for NEW registration (no userId). Skip when userId is present (logged-in company/user paying).
+        if (companyData && companyData.email && !userId) {
             const authModel = require("../models/authmodels");
             const isUserExist = await authModel.checkAvailablity(companyData.email);
             if (isUserExist && isUserExist.length > 0) {
